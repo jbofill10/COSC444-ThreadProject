@@ -3,9 +3,13 @@ package edu.frostburg.cosc444;
 import edu.frostburg.cosc444.sql.Database;
 import edu.frostburg.cosc444.sql.Insert;
 import edu.frostburg.cosc444.sql.Query;
+import edu.frostburg.cosc444.sql.TableSplit;
 
 import java.sql.Connection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReentrantLock;
@@ -37,18 +41,45 @@ public class JavaApplication {
 
         ExecutorService pool = Executors.newFixedThreadPool(8);
 
-        ReentrantLock lock = new ReentrantLock();
+        // Hashmap used to store the start and end for each thread to query 
+        HashMap<Integer, TableSplit> tableSplit = new HashMap<>();
 
-        Query query = new Query(connection, lock);
-        Query query1 = new Query(connection, lock);
-        Query query2 = new Query(connection, lock);
-        Query query3 = new Query(connection, lock);
-        Query query4 = new Query(connection, lock);
-        Query query5 = new Query(connection, lock);
-        Query query6 = new Query(connection, lock);
-        Query query7 = new Query(connection, lock);
+        // gets record count in table
+        int size = db.getCount();
 
-        pool.execute(query);
+        /**
+         * Weird logic here, but I split the table count by 8 (since 8 threads)
+         * So the hashmap has an offset from start of the table. So an offset of 1 = table size / 8 * 1
+         * So basically it tells me where to start and when to stop in terms of querying for records
+         * For the last split of the table, I also add on the moduolo of the table size to get the last bit of records
+         */
+        for(int i = 0; i<8; i++){
+            if(i == 0) {
+                TableSplit tS = new TableSplit((size / 8 * i), (size / 8 * (i + 1)));
+                tableSplit.put(i+1, tS);
+            }
+
+            else if(i==7){
+                TableSplit tS = new TableSplit((size / 8 * i), ((size / 8 * (i + 1)) + size%8));
+                tableSplit.put(i+1, tS);
+            }
+
+            else {
+                TableSplit tS = new TableSplit((size / 8 * i) + 1, (size / 8 * (i + 1)));
+                tableSplit.put(i+1, tS);
+            }
+
+        }
+
+        Query query1 = new Query(1, tableSplit);
+        Query query2 = new Query(2, tableSplit);
+        Query query3 = new Query(3, tableSplit);
+        Query query4 = new Query(4, tableSplit);
+        Query query5 = new Query(5, tableSplit);
+        Query query6 = new Query(6, tableSplit);
+        Query query7 = new Query(7, tableSplit);
+        Query query8 = new Query(8, tableSplit);
+
         pool.execute(query1);
         pool.execute(query2);
         pool.execute(query3);
@@ -56,6 +87,7 @@ public class JavaApplication {
         pool.execute(query5);
         pool.execute(query6);
         pool.execute(query7);
+        pool.execute(query8);
 
         pool.shutdown();
 
